@@ -497,6 +497,10 @@ cdef extern from 'jxl/encode.h':
         const JxlColorEncoding* color
     ) nogil
 
+    void JxlEncoderInitBasicInfo(
+        JxlBasicInfo* info
+    ) nogil
+
     JxlEncoderStatus JxlEncoderSetBasicInfo(
         JxlEncoder* enc,
         const JxlBasicInfo* info
@@ -638,6 +642,8 @@ cdef class JXLPyEncoder:
         memset(<void*> &self.pixel_format, 0, sizeof(JxlPixelFormat))
         memset(<void*> &self.color_encoding, 0, sizeof(JxlColorEncoding))
 
+        JxlEncoderInitBasicInfo(&self.basic_info)
+
         lossless = bool(quality==100)
 
         self.status = JXL_ENC_SUCCESS
@@ -654,14 +660,14 @@ cdef class JXLPyEncoder:
         
         self.runner = JxlThreadParallelRunnerCreate(NULL, num_threads)
         if self.runner == NULL:
-            self.do_cleanup()
+            self.close()
             raise JXLPyError('JxlThreadParallelRunnerCreate')
         
         self.status = JxlEncoderSetParallelRunner(
             self.encoder, JxlThreadParallelRunner, self.runner
         )
         if self.status != JXL_ENC_SUCCESS:
-            self.do_cleanup()
+            self.close()
             raise JXLPyError('JxlEncoderSetParallelRunner', self.status)
         
         # TODO: allow other colorspaces
@@ -675,7 +681,7 @@ cdef class JXLPyEncoder:
             self.basic_info.alpha_bits = 8
             samples = 4
         else:
-            self.do_cleanup()
+            self.close()
             raise JxlPyArgumentInvalid('colorspace')
         
         self.basic_info.xsize = <uint32_t> size[0]
@@ -696,7 +702,7 @@ cdef class JXLPyEncoder:
         
         self.status = JxlEncoderSetBasicInfo(self.encoder, &self.basic_info)
         if self.status != JXL_ENC_SUCCESS:
-            self.do_cleanup()
+            self.close()
             raise JXLPyError('JxlEncoderSetBasicInfo', self.status)
         
         self.pixel_format.data_type = JXL_TYPE_UINT8
@@ -709,7 +715,7 @@ cdef class JXLPyEncoder:
         elif endianness == 'native':
             self.pixel_format.endianness = JXL_NATIVE_ENDIAN
         else:
-            self.do_cleanup()
+            self.close()
             raise JxlPyArgumentInvalid('endianness')
         
         self.pixel_format.align = 0  # TODO: allow strides
@@ -725,36 +731,36 @@ cdef class JXLPyEncoder:
 
         self.status = JxlEncoderSetColorEncoding(self.encoder, &self.color_encoding)
         if self.status != JXL_ENC_SUCCESS:
-            self.do_cleanup()
+            self.close()
             raise JXLPyError('JxlEncoderSetColorEncoding', self.status)
 
         self.status = JxlEncoderUseContainer(self.encoder, use_container)
         if self.status != JXL_ENC_SUCCESS:
-            self.do_cleanup()
+            self.close()
             raise JXLPyError('JxlEncoderUseContainer', self.status)
 
         self.options = JxlEncoderOptionsCreate(self.encoder, NULL)
         if self.options == NULL:
-            self.do_cleanup()
+            self.close()
             raise JXLPyError('JxlEncoderOptionsCreate')
         
         distance = get_distance(quality)
         
         self.status = JxlEncoderOptionsSetLossless(self.options, lossless)
         if self.status != JXL_ENC_SUCCESS:
-            self.do_cleanup()
+            self.close()
             raise JXLPyError('JxlEncoderOptionsSetLossless', self.status)
 
         self.status = JxlEncoderOptionsSetDistance(self.options, distance)
         if self.status != JXL_ENC_SUCCESS:
-            self.do_cleanup()
+            self.close()
             raise JXLPyError('JxlEncoderOptionsSetDistance', self.status)
 
         self.status = JxlEncoderOptionsSetDecodingSpeed(
             self.options, decoding_speed
         )
         if self.status != JXL_ENC_SUCCESS:
-            self.do_cleanup()
+            self.close()
             raise JXLPyError(
                 'JxlEncoderOptionsSetDecodingSpeed', self.status
                 )

@@ -7,7 +7,7 @@ from libcpp.vector cimport vector
 from libcpp.utility cimport pair
 import math
 
-__version__ = '0.9.0'
+__version__ = '0.9.1'
 
 
 cdef extern from 'jxl/types.h':

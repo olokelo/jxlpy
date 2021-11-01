@@ -1,14 +1,20 @@
 # JXLPy
 
-This module introduces reading and writing support for Jpeg XL directly from Python 3.
+This module introduces reading and writing support for JPEG XL directly from Python 3.
 
-JXLPy is based on Jpeg XL implementation in [imagecodecs](https://github.com/cgohlke/imagecodecs) but doesn't it require Numpy and any external dependencies besides Cython and [libjxl](https://github.com/libjxl/libjxl).
+JXLPy is based on JPEG XL implementation in [imagecodecs](https://github.com/cgohlke/imagecodecs) but doesn't it require Numpy and any external dependencies besides Cython and [libjxl](https://github.com/libjxl/libjxl).
 
 It also provides support for Pillow via plugin.
 
 **This project is still in alpha stages and needs testing. It may contain bugs!**
 
-## Installation
+## Install via PIP
+
+```shell
+$ pip install jxlpy
+```
+
+## Build it yourself
 
 * Make sure you are using Python 3.x and pip for that version
 

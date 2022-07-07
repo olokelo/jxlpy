@@ -17,5 +17,3 @@ while True:
         break
     
     print('First pixel is:', list(frame[:3] if colorspace == 'RGB' else frame[:4]))
-
-dec.close()

@@ -8,5 +8,3 @@ enc.add_frame(data)
 
 with open('test.jxl', 'wb') as f:
     f.write(enc.get_output())
-
-enc.close()

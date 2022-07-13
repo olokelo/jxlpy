@@ -18,7 +18,7 @@ jobs:
       CIBW_SKIP: cp27-* pp*
       CIBW_BEFORE_ALL: >
         pip install cmake>=3.5 &&
-        git clone https://github.com/libjxl/libjxl.git --recursive &&
+        git clone https://github.com/libjxl/libjxl.git &&
         cd libjxl* &&
         git checkout v0.6.1 &&
         sh ./deps.sh &&
@@ -66,7 +66,7 @@ jobs:
     - name: Install dependencies
       run: >
         pip install cmake>=3.5 &&
-        git clone https://github.com/libjxl/libjxl.git --recursive &&
+        git clone https://github.com/libjxl/libjxl.git &&
         cd libjxl* &&
         git checkout v0.6.1 &&
         sh ./deps.sh &&

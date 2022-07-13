@@ -21,6 +21,7 @@ jobs:
         git clone https://github.com/libjxl/libjxl.git --recursive &&
         cd libjxl* &&
         git checkout v0.6.1 &&
+        sh ./deps.sh &&
         sed -i 's/target_link_libraries(hwy_benchmark hwy)/target_link_libraries(hwy_benchmark hwy)\ntarget_link_libraries(hwy_benchmark -lrt)/g' ./third_party/highway/CMakeLists.txt &&
         mkdir build && cd build &&
         cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DJPEGXL_ENABLE_BENCHMARK=OFF -DJPEGXL_ENABLE_TOOLS=OFF -DJPEGXL_ENABLE_DEVTOOLS=OFF .. &&
@@ -68,6 +69,7 @@ jobs:
         git clone https://github.com/libjxl/libjxl.git --recursive &&
         cd libjxl* &&
         git checkout v0.6.1 &&
+        sh ./deps.sh &&
         sed -i 's/target_link_libraries(hwy_benchmark hwy)/target_link_libraries(hwy_benchmark hwy)\ntarget_link_libraries(hwy_benchmark -lrt)/g' ./third_party/highway/CMakeLists.txt &&
         mkdir build && cd build &&
         cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DJPEGXL_ENABLE_BENCHMARK=OFF -DJPEGXL_ENABLE_TOOLS=OFF -DJPEGXL_ENABLE_DEVTOOLS=OFF .. &&

@@ -1,7 +1,7 @@
 # distutils: language = c++
 # cython: language_level = 3
 
-from libc.stdint cimport uint8_t, uint32_t, uint64_t
+from libc.stdint cimport uint8_t, int32_t, uint32_t, uint64_t
 from libc.string cimport memset
 from libcpp.vector cimport vector
 from libcpp.utility cimport pair
@@ -23,6 +23,7 @@ cdef extern from 'jxl/types.h':
         JXL_TYPE_UINT8
         JXL_TYPE_UINT16
         JXL_TYPE_UINT32
+        JXL_TYPE_FLOAT16
 
     ctypedef enum JxlEndianness:
         JXL_NATIVE_ENDIAN
@@ -98,6 +99,8 @@ cdef extern from 'jxl/codestream_header.h':
         JXL_BOOL alpha_premultiplied
         JxlPreviewHeader preview
         JxlAnimationHeader animation
+        uint32_t intrinsic_xsize
+        uint32_t intrinsic_ysize
 
     ctypedef struct JxlExtraChannelInfo:
         JxlExtraChannelType type
@@ -105,7 +108,7 @@ cdef extern from 'jxl/codestream_header.h':
         uint32_t exponent_bits_per_sample
         uint32_t dim_shift
         uint32_t name_length
-        JXL_BOOL alpha_associated
+        JXL_BOOL alpha_premultiplied
         float spot_color[4]
         uint32_t cfa_channel
 
@@ -263,6 +266,11 @@ cdef extern from 'jxl/decode.h':
         const JxlMemoryManager* memory_manager
     ) nogil
 
+    JxlEncoderStatus JxlEncoderSetCodestreamLevel(
+        JxlEncoder* enc,
+        int level
+    ) nogil
+
     void JxlDecoderReset(
         JxlDecoder* dec
     ) nogil
@@ -336,6 +344,21 @@ cdef extern from 'jxl/decode.h':
         const JxlDecoder* dec,
         size_t index,
         JxlExtraChannelInfo* info
+    ) nogil
+
+    JxlDecoderStatus JxlDecoderExtraChannelBufferSize(
+        const JxlDecoder* dec,
+        const JxlPixelFormat* format,
+        size_t* size,
+        uint32_t index
+    ) nogil
+
+    JxlDecoderStatus JxlDecoderSetExtraChannelBuffer(
+        JxlDecoder* dec,
+        const JxlPixelFormat* format,
+        void* buffer,
+        size_t size,
+        uint32_t index
     ) nogil
 
     JxlDecoderStatus JxlDecoderGetExtraChannelName(
@@ -442,7 +465,7 @@ cdef extern from 'jxl/encode.h':
     ctypedef struct JxlEncoder:
         pass
 
-    ctypedef struct JxlEncoderOptions:
+    ctypedef struct JxlEncoderFrameSettings:
         pass
 
     ctypedef enum JxlEncoderStatus:
@@ -476,19 +499,43 @@ cdef extern from 'jxl/encode.h':
     ) nogil
 
     JxlEncoderStatus JxlEncoderAddJPEGFrame(
-        const JxlEncoderOptions* options,
+        const JxlEncoderFrameSettings* frame_settings,
         const uint8_t* buffer,
         size_t size
     ) nogil
 
     JxlEncoderStatus JxlEncoderAddImageFrame(
-        const JxlEncoderOptions* options,
+        const JxlEncoderFrameSettings* frame_settings,
         const JxlPixelFormat* pixel_format,
         const void* buffer,
         size_t size
+    )
+
+    ctypedef enum JxlEncoderFrameSettingId:
+        JXL_ENC_FRAME_SETTING_MODULAR = 11
+        JXL_ENC_FRAME_SETTING_COLOR_TRANSFORM = 24
+        JXL_ENC_FRAME_SETTING_MODULAR_COLOR_SPACE = 25
+        JXL_ENC_FRAME_SETTING_MODULAR_NB_PREV_CHANNELS = 29
+
+    JxlEncoderStatus JxlEncoderFrameSettingsSetOption(
+        JxlEncoderFrameSettings* frame_settings,
+        int32_t option,
+        int32_t value
+    )
+
+    JxlEncoderStatus JxlEncoderSetExtraChannelBuffer(
+        const JxlEncoderFrameSettings* frame_settings,
+        const JxlPixelFormat* pixel_format,
+        const void* buffer,
+        size_t size,
+        uint32_t index
     ) nogil
 
     void JxlEncoderCloseInput(
+        JxlEncoder* enc
+    ) nogil
+
+    void JxlEncoderCloseFrames(
         JxlEncoder* enc
     ) nogil
 
@@ -517,28 +564,28 @@ cdef extern from 'jxl/encode.h':
     ) nogil
 
     JxlEncoderStatus JxlEncoderOptionsSetLossless(
-        JxlEncoderOptions* options,
+        JxlEncoderFrameSettings* frame_settings,
         JXL_BOOL lossless
     ) nogil
 
     JxlEncoderStatus JxlEncoderOptionsSetDecodingSpeed(
-        JxlEncoderOptions* options,
+        JxlEncoderFrameSettings* frame_settings,
         int tier
     ) nogil
 
     JxlEncoderStatus JxlEncoderOptionsSetEffort(
-        JxlEncoderOptions* options,
+        JxlEncoderFrameSettings* frame_settings,
         int effort
     ) nogil
 
     JxlEncoderStatus JxlEncoderOptionsSetDistance(
-        JxlEncoderOptions* options,
+        JxlEncoderFrameSettings* frame_settings,
         float distance
     ) nogil
 
-    JxlEncoderOptions* JxlEncoderOptionsCreate(
+    JxlEncoderFrameSettings* JxlEncoderOptionsCreate(
         JxlEncoder* enc,
-        const JxlEncoderOptions* source
+        const JxlEncoderFrameSettings* source
     ) nogil
 
     void JxlColorEncodingSetToSRGB(
@@ -606,7 +653,7 @@ cdef class JXLPyEncoder:
     cdef uint8_t* src
     cdef void* runner
     cdef JxlEncoder* encoder
-    cdef JxlEncoderOptions* options
+    cdef JxlEncoderFrameSettings* options
     cdef JxlEncoderStatus status
     cdef JxlBasicInfo basic_info
     cdef JxlPixelFormat pixel_format
@@ -679,7 +726,7 @@ cdef class JXLPyEncoder:
             self.basic_info.alpha_bits = 8
             samples = 4
         else:
-            raise JxlPyArgumentInvalid('colorspace')
+            raise JxlPyArgumentInvalid('Unknown colorspace.')
         
         self.basic_info.xsize = <uint32_t> size[0]
         self.basic_info.ysize = <uint32_t> size[1]
@@ -735,9 +782,9 @@ cdef class JXLPyEncoder:
         self.options = JxlEncoderOptionsCreate(self.encoder, NULL)
         if self.options == NULL:
             raise JXLPyError('JxlEncoderOptionsCreate')
-        
+
         distance = get_distance(quality)
-        
+
         self.status = JxlEncoderOptionsSetLossless(self.options, lossless)
         if self.status != JXL_ENC_SUCCESS:
             raise JXLPyError('JxlEncoderOptionsSetLossless', self.status)
@@ -777,8 +824,8 @@ cdef class JXLPyEncoder:
         
         return True
 
-
     def get_output(self):
+        JxlEncoderCloseFrames(self.encoder)
     
         cdef vector[uint8_t] compressed
         compressed.resize(64)
@@ -810,10 +857,7 @@ cdef class JXLPyEncoder:
         
         return compressed.data()[:compressed.size()]
 
-
     def __dealloc__(self):
-
-        #print("e dealloc!")
         if self.encoder != NULL:
             JxlEncoderDestroy(self.encoder)
         if self.runner != NULL:
@@ -888,7 +932,6 @@ cdef class JXLPyDecoder(object):
 
 
     def get_colorspace(self):
-    
         self.get_info()
         
         # TODO: add more colorspace information by analysing JXL_DEC_COLOR_ENCODING
@@ -896,7 +939,6 @@ cdef class JXLPyDecoder(object):
             return 'RGBA'
         else:
             return 'RGB'
-        
 
     # returns Python dictionary converted by cython
     def get_info(self):
@@ -914,9 +956,8 @@ cdef class JXLPyDecoder(object):
                 self.status = JxlDecoderGetBasicInfo(self.decoder, &self.basic_info)
                 if self.status != JXL_DEC_SUCCESS:
                     raise JXLPyError('JxlDecoderGetBasicInfo', self.status)
-                
-                samples = (self.basic_info.num_color_channels + self.basic_info.num_extra_channels)
 
+                samples = (self.basic_info.num_color_channels + self.basic_info.num_extra_channels)
                 self.pixel_format.num_channels = <uint32_t> samples
                 self.pixel_format.endianness = JXL_NATIVE_ENDIAN
                 self.pixel_format.align = 0
@@ -937,7 +978,7 @@ cdef class JXLPyDecoder(object):
                 elif self.basic_info.bits_per_sample <= 16:
                     self.pixel_format.data_type = JXL_TYPE_UINT16
                 elif self.basic_info.bits_per_sample <= 32:
-                    self.pixel_format.data_type = JXL_TYPE_UINT32
+                    self.pixel_format.data_type = JXL_TYPE_FLOAT
 
             else:
                 # TODO: write the correct way to get information about an image
@@ -949,7 +990,9 @@ cdef class JXLPyDecoder(object):
 
     def get_frame(self):
 
+        cdef JxlExtraChannelInfo extra_info
         cdef vector[uint8_t] data_out
+        cdef vector[uint8_t] extra_out[8];
 
         if self.decoding_finished:
             return None
@@ -963,7 +1006,6 @@ cdef class JXLPyDecoder(object):
         )
 
         while True:
-        
             self.status = JxlDecoderProcessInput(self.decoder)
             
             if (self.status == JXL_DEC_ERROR or self.status == JXL_DEC_NEED_MORE_INPUT):
@@ -977,11 +1019,9 @@ cdef class JXLPyDecoder(object):
                 return None
 
             if self.status == JXL_DEC_BASIC_INFO:
-            
                 raise RuntimeError('This should not happen here')
                 
-            elif self.status == JXL_DEC_NEED_IMAGE_OUT_BUFFER:
-            
+            if self.status == JXL_DEC_NEED_IMAGE_OUT_BUFFER:
                 self.status = JxlDecoderImageOutBufferSize(
                     self.decoder, &self.pixel_format, &self.buffer_size
                 )
@@ -1001,8 +1041,6 @@ cdef class JXLPyDecoder(object):
 
 
     def __dealloc__(self):
-    
-        #print("d dealloc!")
         if self.decoder != NULL:
             JxlDecoderDestroy(self.decoder)
         if self.runner != NULL:

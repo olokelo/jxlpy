@@ -671,7 +671,7 @@ cdef class JXLPyEncoder:
     # decoding_speed: 0..4 -> decoding speed speed/(quality&size) tradeoff,
     #                         decoding is fast even on level 0 (the slowest one)
     # use_container -> if True, JXL encoder will wrap image data into JXL contaier (recommended)
-    # colorspace -> for now only RGB and RGBA are supported
+    # colorspace -> for now only RGB, RGBA, L, LA are supported
     # endianness -> can be little, big or native
     # num_threads: 0..n -> leaving 0 (default) will use all available cpu threads,
     #                      setting it to fixed number (t) will use only t threads
@@ -725,6 +725,15 @@ cdef class JXLPyEncoder:
             self.basic_info.num_color_channels = 3
             self.basic_info.alpha_bits = 8
             samples = 4
+        elif colorspace == 'L':
+            self.colorspace = JXL_COLOR_SPACE_GRAY
+            self.basic_info.num_color_channels = 1
+            samples = 1
+        elif colorspace == 'LA':
+            self.colorspace = JXL_COLOR_SPACE_GRAY
+            self.basic_info.num_color_channels = 1
+            self.basic_info.alpha_bits = 8
+            samples = 2
         else:
             raise JxlPyArgumentInvalid('Unknown colorspace.')
         
@@ -936,9 +945,19 @@ cdef class JXLPyDecoder(object):
         
         # TODO: add more colorspace information by analysing JXL_DEC_COLOR_ENCODING
         if self.basic_info.alpha_bits > 0:
-            return 'RGBA'
-        else:
+            if self.basic_info.num_color_channels == 3:
+                if self.basic_info.alpha_premultiplied:
+                    return 'RGBa'
+                return 'RGBA'
+            if self.basic_info.num_color_channels == 1:
+                if self.basic_info.alpha_premultiplied:
+                    return 'La'
+                return 'LA'
+        if self.basic_info.num_color_channels == 3:
             return 'RGB'
+        if self.basic_info.num_color_channels == 1:
+            return 'L'
+        raise JxlPyArgumentInvalid("Unknown colorspace.")
 
     # returns Python dictionary converted by cython
     def get_info(self):

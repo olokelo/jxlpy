@@ -2,7 +2,7 @@ from PIL import Image, ImageFile
 from io import BytesIO
 import jxlpy
 
-_VALID_JXL_MODES = {"RGB", "RGBA"}
+_VALID_JXL_MODES = {"RGB", "RGBA", "L", "LA"}
 
 
 def _accept(data):
@@ -70,7 +70,7 @@ class JXLImageFile(ImageFile.ImageFile):
 def _save(im, fp, filename, save_all=False):
 
     if im.mode not in _VALID_JXL_MODES:
-        raise NotImplementedError('Only RGB and RGBA are supported.')
+        raise NotImplementedError('Only RGB, RGBA, L, LA are supported.')
 
     info = im.encoderinfo.copy()
     

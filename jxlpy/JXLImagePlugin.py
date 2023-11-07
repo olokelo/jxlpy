@@ -28,7 +28,7 @@ class JXLImageFile(ImageFile.ImageFile):
             raise NotImplementedError('bits_per_sample not equals 8')
         self._size = (self._jxlinfo['xsize'], self._jxlinfo['ysize'])
         self.is_animated = self._jxlinfo['have_animation']
-        self.mode = self.rawmode = self._decoder.get_colorspace()
+        self._mode = self.rawmode = self._decoder.get_colorspace()
         self.tile = []
 
 

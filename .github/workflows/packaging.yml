@@ -12,17 +12,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-20.04]
+        os: [ubuntu-22.04]
 
     env:
       CIBW_SKIP: cp27-* pp*
       CIBW_BEFORE_ALL: >
         pip install cmake>=3.5 &&
-        git clone https://github.com/libjxl/libjxl.git &&
+        git clone https://github.com/libjxl/libjxl.git --recursive --shallow-submodules &&
         cd libjxl* &&
-        git checkout v0.6.1 &&
-        sh ./deps.sh &&
-        sed -i 's/target_link_libraries(hwy_benchmark hwy)/target_link_libraries(hwy_benchmark hwy)\ntarget_link_libraries(hwy_benchmark -lrt)/g' ./third_party/highway/CMakeLists.txt &&
+        git checkout v0.9.1 &&
         mkdir build && cd build &&
         cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DJPEGXL_ENABLE_BENCHMARK=OFF -DJPEGXL_ENABLE_TOOLS=OFF -DJPEGXL_ENABLE_DEVTOOLS=OFF .. &&
         cmake --build . -- -j$(nproc) &&
@@ -38,7 +36,7 @@ jobs:
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
-        python-version: 3.9
+        python-version: 3.12
     - name: Install cibuildwheel
       run: python -m pip install cibuildwheel
     - name: Build wheels
@@ -55,27 +53,29 @@ jobs:
 
   sdist:
     name: Build source distribution
-    runs-on: ubuntu-20.04
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04]
 
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python
       uses: actions/setup-python@v2
       with:
-        python-version: 3.9
+        python-version: 3.12
     - name: Install dependencies
       run: >
         pip install cmake>=3.5 &&
-        git clone https://github.com/libjxl/libjxl.git &&
+        git clone https://github.com/libjxl/libjxl.git --recursive --shallow-submodules &&
         cd libjxl* &&
-        git checkout v0.6.1 &&
-        sh ./deps.sh &&
-        sed -i 's/target_link_libraries(hwy_benchmark hwy)/target_link_libraries(hwy_benchmark hwy)\ntarget_link_libraries(hwy_benchmark -lrt)/g' ./third_party/highway/CMakeLists.txt &&
+        git checkout v0.9.1 &&
         mkdir build && cd build &&
         cmake -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DJPEGXL_ENABLE_BENCHMARK=OFF -DJPEGXL_ENABLE_TOOLS=OFF -DJPEGXL_ENABLE_DEVTOOLS=OFF .. &&
         cmake --build . -- -j$(nproc) &&
-        sudo cmake --install . &&
-        sudo cp ./third_party/brotli/*.so* /usr/local/lib
+        cmake --install . &&
+        cp ./third_party/brotli/*.so* /usr/local/lib
     - name: Install python-build
       run: python -m pip install build
     - name: Create packages

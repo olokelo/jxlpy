@@ -29,6 +29,9 @@ class JXLImageFile(ImageFile.ImageFile):
         self._size = (self._jxlinfo['xsize'], self._jxlinfo['ysize'])
         self.is_animated = self._jxlinfo['have_animation']
         self._mode = self.rawmode = self._decoder.get_colorspace()
+        
+        self.info['icc'] = self._decoder.get_icc_profile()
+        
         self.tile = []
 
 
@@ -73,6 +76,7 @@ def _save(im, fp, filename, save_all=False):
         raise NotImplementedError('Only RGB, RGBA, L, LA are supported.')
 
     info = im.encoderinfo.copy()
+    icc_profile = info.get("icc_profile") or b""
     
     # default quality is 70
     quality = info.get('quality', 70)
@@ -86,7 +90,7 @@ def _save(im, fp, filename, save_all=False):
     enc = jxlpy.JXLPyEncoder(
         quality=quality, size=im.size, colorspace=im.mode, 
         effort=effort, decoding_speed=decoding_speed, use_container=use_container,
-        num_threads=num_threads
+        num_threads=num_threads, icc_profile=icc_profile
     )
     
     enc.add_frame(im.tobytes())

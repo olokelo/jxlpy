@@ -74,12 +74,12 @@ $ pip install jxlpy
 |                  Reading animations                   |     Done      |     -      |                   -                   |
 |                     Pillow plugin                     |    Partial    |    High    |          Animation seeking?           |
 |                  Creating animations                  |    Failed     |   Medium   |                   -                   |
-|                  Reading HDR images                   | Needs testing |   Medium   |                   -                   |
-|                  Writing HDR images                   |  Not started  |    Low     |                   -                   |
+|                  Reading HDR images                   |     Done      |   Medium   |                   -                   |
+|                  Writing HDR images                   |     Done      |    Low     |                   -                   |
 |       Reading and writing floating point images       |  Not started  |    Low     |                   -                   |
-|                 Support EXIF metadata                 |    Failed     |    High    | It seems like there's no API for that |
+|                 Support EXIF metadata                 |    Failed     |    High    |                   -                   |
 |             Support for other colorspaces             |  Not started  |    Low     |                   -                   |
 |        Support for lossless JPEG recompression        |  Not started  |   Medium   |                   -                   |
-|      Support for progressive and responsive mode      |    Failed     |   Medium   |      Again... no high level API?      |
-|                 Installing on Windows                 | Needs testing |    Low     |                   -                   |
+|      Support for progressive and responsive mode      |    Failed     |   Medium   |                   -                   |
+|                 Installing on Windows                 |    Partial    |    Low     |                   -                   |
 

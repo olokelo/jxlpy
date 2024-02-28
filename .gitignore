@@ -5,6 +5,7 @@ wheelhouse/
 *.egg-info/
 __pycache__/
 _jxlpy/_jxl.cpp
+examples/*.jxl
 
 *.so
 *.whl

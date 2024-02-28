@@ -1,5 +1,6 @@
 from setuptools import Extension, setup
 from Cython.Build import cythonize
+import os
 
 
 with open("README.md", 'r') as f:
@@ -8,7 +9,7 @@ with open("README.md", 'r') as f:
 
 jxlpy_ext = Extension(
     name="_jxlpy",
-    sources=["_jxlpy/_jxl.pyx"],
+    sources=["_jxlpy/_jxl.pyx" if os.path.exists("_jxlpy/_jxl.pyx") else "_jxlpy/_jxl.cpp"],
     include_dirs=[],
     extra_compile_args=['-O2'],
     extra_link_args=['-ljxl', '-ljxl_threads'],
@@ -17,7 +18,7 @@ jxlpy_ext = Extension(
 
 
 setup(name='jxlpy',
-      version='0.9.3',
+      version='0.9.4',
       description='JPEG XL integration in Python',
       long_description=long_description,
       long_description_content_type='text/markdown',

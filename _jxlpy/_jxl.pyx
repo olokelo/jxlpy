@@ -1036,13 +1036,16 @@ cdef class JXLPyEncoder:
     #                         decoding is fast even on level 0 (the slowest one)
     # use_container -> if True, JXL encoder will wrap image data into JXL contaier (recommended)
     # colorspace -> for now only RGB, RGBA, L, LA are supported
+    # bit_depth -> bit depth of the image (usually 8 or 16)
+    # alpha_bit_depth -> bit depth of the alpha channel, only used when selected colorspace has alpha
     # endianness -> can be little, big or native
     # num_threads: 0..n -> leaving 0 (default) will use all available cpu threads,
     #                      setting it to fixed number (t) will use only t threads
     #                      it is recommended to keep n <= $threads_of_your_cpu
+    # icc_profile: color profile information to be embedded into image as bytes
     def __init__(self, quality: int, size: tuple, effort: int=7, decoding_speed: int=0,
                  use_container: bool=True, colorspace: str='RGB', bit_depth: int=8, alpha_bit_depth: int=8,
-                 endianness: str='native', num_threads: int=0):
+                 endianness: str='native', num_threads: int=0, icc_profile: bytes=b''):
 
         _check_arg(quality, 'quality', (0, 100))
         _check_arg(effort, 'effort', (3, 9))
@@ -1051,6 +1054,8 @@ cdef class JXLPyEncoder:
         _check_arg(bit_depth, 'bit_depth', (1, 16))
         # alpha_bit_depth is ignored if appropriate colorspace is not set, however it also can be 0
         _check_arg(alpha_bit_depth, 'alpha_bit_depth', (0, 16))
+
+        cdef vector[uint8_t] color_profile = icc_profile
 
         memset(<void*> &self.basic_info, 0, sizeof(JxlBasicInfo))
         memset(<void*> &self.pixel_format, 0, sizeof(JxlPixelFormat))
@@ -1109,8 +1114,7 @@ cdef class JXLPyEncoder:
         self.basic_info.num_extra_channels = (
             <uint32_t> samples - self.basic_info.num_color_channels
         )
-        # TODO: support higher bit-depth; maybe done?
-        # TODO: ICC profile support
+
         self.basic_info.bits_per_sample = bit_depth
         #self.basic_info.have_animation = JXL_TRUE   # animation support doesn't work?
         #self.basic_info.animation.tps_numerator = 100
@@ -1139,18 +1143,23 @@ cdef class JXLPyEncoder:
         
         self.pixel_format.align = 0  # TODO: allow strides
         
-        if self.pixel_format.data_type == JXL_TYPE_UINT8:
-            JxlColorEncodingSetToSRGB(
-                &self.color_encoding, self.colorspace == JXL_COLOR_SPACE_GRAY
-            )
-        else:
-            JxlColorEncodingSetToLinearSRGB(
-                &self.color_encoding, self.colorspace == JXL_COLOR_SPACE_GRAY
-            )
+        if color_profile.empty():
+            if self.pixel_format.data_type == JXL_TYPE_UINT8:
+                JxlColorEncodingSetToSRGB(
+                    &self.color_encoding, self.colorspace == JXL_COLOR_SPACE_GRAY
+                )
+            else:
+                JxlColorEncodingSetToLinearSRGB(
+                    &self.color_encoding, self.colorspace == JXL_COLOR_SPACE_GRAY
+                )
 
-        self.status = JxlEncoderSetColorEncoding(self.encoder, &self.color_encoding)
-        if self.status != JXL_ENC_SUCCESS:
-            raise JXLPyError('JxlEncoderSetColorEncoding', self.status)
+            self.status = JxlEncoderSetColorEncoding(self.encoder, &self.color_encoding)
+            if self.status != JXL_ENC_SUCCESS:
+                raise JXLPyError('JxlEncoderSetColorEncoding', self.status)
+        else:
+            self.status = JxlEncoderSetICCProfile(self.encoder, color_profile.data(), color_profile.size());
+            if (self.status != JXL_ENC_SUCCESS):
+                raise JXLPyError('JxlEncoderSetICCProfile', self.status)
 
         self.status = JxlEncoderUseContainer(self.encoder, use_container)
         if self.status != JXL_ENC_SUCCESS:
@@ -1256,6 +1265,8 @@ cdef class JXLPyDecoder(object):
     cdef size_t num_threads
     cdef bint decoding_finished
 
+    cdef vector[uint8_t] icc_profile
+
     def __init__(self, jxl_data: bytes, keep_orientation: bool=True, num_threads: int=0):
         
         self.src = jxl_data
@@ -1289,7 +1300,7 @@ cdef class JXLPyDecoder(object):
             raise JXLPyError('JxlDecoderSetParallelRunner', self.status)
         
         self.status = JxlDecoderSubscribeEvents(
-            self.decoder, JXL_DEC_BASIC_INFO | JXL_DEC_FULL_IMAGE
+            self.decoder, JXL_DEC_BASIC_INFO | JXL_DEC_COLOR_ENCODING | JXL_DEC_FULL_IMAGE
         )
         if self.status != JXL_DEC_SUCCESS:
             raise JXLPyError('JxlDecoderSubscribeEvents', self.status)
@@ -1323,8 +1334,15 @@ cdef class JXLPyDecoder(object):
             return 'L'
         raise JxlPyArgumentInvalid("Unknown colorspace.")
 
+
+    def get_icc_profile(self):
+        self.get_info()
+        return self.icc_profile.data()[:self.icc_profile.size()]
+
+
     # returns Python dictionary converted by cython
     def get_info(self):
+        cdef size_t icc_profile_size
 
         # size of the image cannot be 0 so I assume this means basic_info is not initialized
         if self.basic_info.xsize == 0:
@@ -1367,6 +1385,20 @@ cdef class JXLPyDecoder(object):
                 # TODO: write the correct way to get information about an image
                 #       JXLDecoderReset???
                 raise NotImplementedError('basic_info not found at current state')
+
+            self.status = JxlDecoderProcessInput(self.decoder)
+            if (self.status == JXL_DEC_ERROR or self.status == JXL_DEC_NEED_MORE_INPUT):
+                raise JXLPyError('JxlDecoderProcessInput', self.status)
+
+            if self.status == JXL_DEC_COLOR_ENCODING:
+                self.status = JxlDecoderGetICCProfileSize(self.decoder, JXL_COLOR_PROFILE_TARGET_DATA, &icc_profile_size)
+                if self.status != JXL_DEC_SUCCESS:
+                    raise JXLPyError('JxlDecoderGetICCProfileSize', self.status)
+
+                self.icc_profile.resize(icc_profile_size);
+                self.status = JxlDecoderGetColorAsICCProfile(self.decoder, JXL_COLOR_PROFILE_TARGET_DATA, self.icc_profile.data(), self.icc_profile.size())
+                if self.status != JXL_DEC_SUCCESS:
+                        raise JXLPyError('JxlDecoderGetColorAsICCProfile', self.status)
 
         return self.basic_info
 

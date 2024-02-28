@@ -18,11 +18,13 @@ with open(local_source, 'rb') as f:
 
 dec = jxlpy.JXLPyDecoder(fc)
 info = dec.get_info()
+icc = dec.get_icc_profile()
 colorspace = dec.get_colorspace()
 
 print('\n=== DECODING SOURCE IMAGE ===\n')
 print('Read information about image:', info)
 print('Colorspace:', colorspace)
+print('ICC:', icc)
 
 while True:
 
@@ -32,7 +34,7 @@ while True:
     
     print('Beginning of Image data:', list(frame[:99]))
 
-    enc = jxlpy.JXLPyEncoder(quality=100, colorspace='RGB', size=(info.get('xsize'), info.get('ysize')), effort=3, bit_depth=info.get('bits_per_sample'), alpha_bit_depth=info.get('alpha_bits'))
+    enc = jxlpy.JXLPyEncoder(quality=100, colorspace='RGB', size=(info.get('xsize'), info.get('ysize')), effort=3, bit_depth=info.get('bits_per_sample'), alpha_bit_depth=info.get('alpha_bits'), icc_profile=icc)
     enc.add_frame(frame)
 
     with open('test16.jxl', 'wb') as f:

@@ -1255,6 +1255,7 @@ cdef class JXLPyEncoder:
 cdef class JXLPyDecoder(object):
 
     cdef uint8_t* src
+    cdef size_t src_len
     cdef void* runner
     cdef size_t buffer_size
     cdef JxlDecoder* decoder
@@ -1263,6 +1264,7 @@ cdef class JXLPyDecoder(object):
     cdef JxlBasicInfo basic_info
     cdef JxlPixelFormat pixel_format
     cdef size_t num_threads
+    cdef size_t n_frames
     cdef bint decoding_finished
 
     cdef vector[uint8_t] icc_profile
@@ -1270,10 +1272,9 @@ cdef class JXLPyDecoder(object):
     def __init__(self, jxl_data: bytes, keep_orientation: bool=True, num_threads: int=0):
         
         self.src = jxl_data
-        self.decoding_finished = False
-        src_len = len(jxl_data)
+        self.src_len = len(jxl_data)
         
-        self.signature = JxlSignatureCheck(self.src, src_len)
+        self.signature = JxlSignatureCheck(self.src, self.src_len)
         if self.signature != JXL_SIG_CODESTREAM and self.signature != JXL_SIG_CONTAINER:
             raise ValueError('not a JPEG XL codestream')
 
@@ -1310,9 +1311,50 @@ cdef class JXLPyDecoder(object):
             if self.status != JXL_DEC_SUCCESS:
                 raise JXLPyError('JxlDecoderSetKeepOrientation', self.status)
 
-        self.status = JxlDecoderSetInput(self.decoder, self.src, src_len)
+        self.n_frames = 0
+        self.rewind()
+
+    def rewind(self):
+        JxlDecoderRewind(self.decoder)
+
+        self.status = JxlDecoderSetInput(self.decoder, self.src, self.src_len)
         if self.status != JXL_DEC_SUCCESS:
             raise JXLPyError('JxlDecoderSetInput', self.status)
+        
+        self.decoding_finished = False
+
+    def get_n_frames(self):
+
+        # frames might have been already counted before
+        if self.n_frames != 0:
+            return self.n_frames
+
+        self.rewind()
+        self.get_info()
+
+        if not self.basic_info.have_animation:
+            return 1
+
+        self.n_frames = 0
+        while True:
+            self.status = JxlDecoderProcessInput(self.decoder)
+
+            if self.status == JXL_DEC_SUCCESS:
+                break
+
+            if (self.status == JXL_DEC_ERROR or self.status == JXL_DEC_NEED_MORE_INPUT):
+                raise JXLPyError('JxlDecoderProcessInput', self.status)
+            
+            if self.status == JXL_DEC_NEED_IMAGE_OUT_BUFFER:
+                # skip decoding since we're just counting frames
+                self.status = JxlDecoderSkipCurrentFrame(self.decoder)
+                if (self.status != JXL_DEC_SUCCESS):
+                    raise JXLPyError('JxlDecoderProcessInput', self.status)
+                self.n_frames += 1
+        
+        self.rewind()
+
+        return self.n_frames
 
 
     def get_colorspace(self):
@@ -1432,9 +1474,6 @@ cdef class JXLPyDecoder(object):
             if self.status == JXL_DEC_SUCCESS:
                 self.decoding_finished = True
                 return None
-
-            if self.status == JXL_DEC_BASIC_INFO:
-                raise RuntimeError('This should not happen here')
                 
             if self.status == JXL_DEC_NEED_IMAGE_OUT_BUFFER:
                 self.status = JxlDecoderImageOutBufferSize(

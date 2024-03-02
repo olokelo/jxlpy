@@ -14,8 +14,8 @@ class JXLImageFile(ImageFile.ImageFile):
 
     format = "JXL"
     format_description = "Jpeg XL image"
-    __loaded = -1
-    __frame = 0
+    __loaded = 0
+    __logical_frame = 0
 
     def _open(self):
 
@@ -26,48 +26,90 @@ class JXLImageFile(ImageFile.ImageFile):
         
         if self._jxlinfo['bits_per_sample'] != 8:
             raise NotImplementedError('bits_per_sample not equals 8')
+
         self._size = (self._jxlinfo['xsize'], self._jxlinfo['ysize'])
         self.is_animated = self._jxlinfo['have_animation']
+        self.n_frames = self._decoder.get_n_frames()
         self._mode = self.rawmode = self._decoder.get_colorspace()
-        
+
         self.info['icc'] = self._decoder.get_icc_profile()
         
         self.tile = []
 
+        self._rewind()
+
+
+    def _get_next(self):
+
+        # Get next frame
+        next_frame = self._decoder.get_frame()
+        self.__physical_frame += 1
+
+        # this actually means EOF, errors are raised in _jxl
+        if next_frame is None:
+            msg = "failed to decode next frame in JXL file"
+            raise EOFError(msg)
+
+        return next_frame
+
+    def _rewind(self, hard=False):
+        if hard:
+            self._decoder.rewind()
+        self.__physical_frame = 0
+        self.__loaded = -1
+        self.__timestamp = 0
+
+    def _seek_check(self, frame):
+        # if image is not animated then only the 0th frame is available
+        if (not self.is_animated and frame != 0) or (
+            self.n_frames is not None and (frame >= self.n_frames or frame < 0)
+        ):
+            msg = "attempt to seek outside sequence"
+            raise EOFError(msg)
+
+        return self.tell() != frame
+
+    def _seek(self, frame):
+        # print("_seek: phy: {}, fr: {}".format(self.__physical_frame, frame))
+        if frame == self.__physical_frame:
+            return  # Nothing to do
+        if frame < self.__physical_frame:
+            # also rewind libjxl decoder instance
+            self._rewind(hard=True)
+
+        while self.__physical_frame < frame:
+            self._get_next()  # Advance to the requested frame
 
     def seek(self, frame):
+        if not self._seek_check(frame):
+            return
 
-        self.load()
-    
-        if self.__frame+1 != frame:
-            # I believe JPEG XL doesn't support seeking in animations
-            raise NotImplementedError(
-                'Seeking more than one frame forward is currently not supported.'
-            )
-        self.__frame = frame
-
+        # Set logical frame to requested position
+        self.__logical_frame = frame
 
     def load(self):
 
-        if self.__loaded != self.__frame:
-        
-            data = self._decoder.get_frame()
-            
-            if data is None:
-                EOFError('no more frames')
-            
-            self.__loaded = self.__frame
-            
+        if self.__loaded != self.__logical_frame:
+            self._seek(self.__logical_frame)
+
+            data = self._get_next()
+            self.__loaded = self.__logical_frame
+
+            # Set tile
             if self.fp and self._exclusive_fp:
                 self.fp.close()
             self.fp = BytesIO(data)
             self.tile = [("raw", (0, 0) + self.size, 0, self.rawmode)]
-        
+
         return super().load()
     
+    # this prevents Pillow ValueError since it doesn't try to mmap image data
+    # when we implement selected custom functions
+    def load_seek(self, pos):
+        pass
     
     def tell(self):
-        return self.__frame
+        return self.__logical_frame
 
 
 def _save(im, fp, filename, save_all=False):

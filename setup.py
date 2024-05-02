@@ -18,7 +18,7 @@ jxlpy_ext = Extension(
 
 
 setup(name='jxlpy',
-      version='0.9.4',
+      version='0.9.5',
       description='JPEG XL integration in Python',
       long_description=long_description,
       long_description_content_type='text/markdown',
@@ -33,7 +33,7 @@ setup(name='jxlpy',
       },
       include_package_data=True,
       install_requires=['cython'],
-      extras_require={'pillow': ['Pillow']},
+      extras_require={'pillow>=10.1.0': ['Pillow']},
       python_requires='>=3.4',
       ext_modules=cythonize([jxlpy_ext]),
       classifiers=[

@@ -13,6 +13,11 @@ It also provides support for Pillow via plugin.
 ```shell
 $ pip install jxlpy
 ```
+or
+```shell
+$ pip install jxlpy[pillow]
+```
+if you intend to use the Pillow extension.
 
 ## Build it yourself
 

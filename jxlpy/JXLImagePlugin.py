@@ -30,7 +30,11 @@ class JXLImageFile(ImageFile.ImageFile):
         self._size = (self._jxlinfo['xsize'], self._jxlinfo['ysize'])
         self.is_animated = self._jxlinfo['have_animation']
         self.n_frames = self._decoder.get_n_frames()
-        self._mode = self.rawmode = self._decoder.get_colorspace()
+        mode = self._decoder.get_colorspace()
+        try:
+            self.mode = self.rawmode = mode
+        except AttributeError:
+            self._mode = self.rawmode = mode
 
         self.info['icc'] = self._decoder.get_icc_profile()
         

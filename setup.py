@@ -18,7 +18,7 @@ jxlpy_ext = Extension(
 
 
 setup(name='jxlpy',
-      version='0.9.4',
+      version='0.9.5',
       description='JPEG XL integration in Python',
       long_description=long_description,
       long_description_content_type='text/markdown',

@@ -32,15 +32,22 @@ jobs:
       if: runner.os == 'Linux'
     - name: Print info
       run: ldd --version && uname -a
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
+    - name: Set up QEMU
+      if: runner.os == 'Linux'
+      uses: docker/setup-qemu-action@v3
+      with:
+        platforms: all
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5
       with:
         python-version: 3.12
     - name: Install cibuildwheel
       run: python -m pip install cibuildwheel
     - name: Build wheels
       run: python -m cibuildwheel --output-dir wheelhouse
+      env:
+        CIBW_ARCHS: auto aarch64
     - uses: actions/upload-artifact@master
       with:
         name: wheelhouse-${{ matrix.os }}
@@ -60,9 +67,9 @@ jobs:
         os: [ubuntu-22.04]
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Set up Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5
       with:
         python-version: 3.12
     - name: Install dependencies

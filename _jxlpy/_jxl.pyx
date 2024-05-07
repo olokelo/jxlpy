@@ -1048,7 +1048,7 @@ cdef class JXLPyEncoder:
                  endianness: str='native', num_threads: int=0, icc_profile: bytes=b''):
 
         _check_arg(quality, 'quality', (0, 100))
-        _check_arg(effort, 'effort', (3, 9))
+        _check_arg(effort, 'effort', (1, 10))
         _check_arg(decoding_speed, 'decoding_speed', (0, 4))
         _check_arg(num_threads, 'num_threads', (0, 32))
         _check_arg(bit_depth, 'bit_depth', (1, 16))
